@@ -12,5 +12,7 @@ dependencies = [
     "transformers",
     "torch",
     "ollama",
-    "sentence-transformers"
+    "sentence-transformers",
+    "imblearn",
+    "seaborn"
 ]
