@@ -9,6 +9,4 @@ dependencies = [
     "pandas",
     "scipy",
     "matplotlib",
-    "transformers",
-    "torch"
 ]
