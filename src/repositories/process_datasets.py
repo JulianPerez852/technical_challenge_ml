@@ -1,8 +1,11 @@
 import pandas as pd
 import logging
 from pathlib import Path
-from dataset_processor_factory import DatasetProcessorFactory
-
+try:
+    from dataset_processor_factory import DatasetProcessorFactory
+except ImportError:
+    from repositories.dataset_processor_factory import DatasetProcessorFactory
+    
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 

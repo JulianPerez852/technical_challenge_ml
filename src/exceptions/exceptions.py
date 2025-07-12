@@ -38,3 +38,7 @@ class FeatureTransformationException(Exception):
 class SMOTEApplicationException(Exception):
     """Exception raised when SMOTE balancing fails."""
     pass
+
+class ModelTrainingException(Exception):
+    """Exception raised when model training fails."""
+    pass

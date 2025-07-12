@@ -17,13 +17,20 @@ from sklearn.feature_selection import SelectKBest, f_classif
 
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.exceptions.exceptions import (
-    DataLoadingException, 
-    DataSavingException, 
-    DataAnalysisException
-)
+try:
+    from exceptions.exceptions import (
+        DataLoadingException, 
+        DataSavingException, 
+        DataAnalysisException
+    )
+except ImportError:
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+    from exceptions.exceptions import (
+        DataLoadingException, 
+        DataSavingException, 
+        DataAnalysisException
+    )
 
 warnings.filterwarnings('ignore')
 
@@ -82,7 +89,7 @@ class DatasetProcessor:
         return logger
     
     def load_processed_data(self, train_file: str = "training_data_processed.csv", 
-                           test_file: str = "test_data_processed.csv") -> None:
+                        test_file: str = "test_data_processed.csv") -> None:
         """
         Load preprocessed training and test data
         
@@ -313,7 +320,7 @@ class DatasetProcessor:
             raise DataAnalysisException(f"Error in PCA application: {str(e)}")
     
     def generate_feature_selected_datasets(self, output_dir: str = None, 
-                                         selected_features: List[str] = None) -> None:
+                                        selected_features: List[str] = None) -> None:
         """
         Generate datasets with selected features
         
@@ -454,7 +461,7 @@ class DatasetProcessor:
             raise DataSavingException(f"Error saving models: {str(e)}")
     
     def run_full_analysis(self, generate_pca: bool = True, generate_features: bool = True,
-                         output_dir: str = None) -> Dict[str, Any]:
+                        output_dir: str = None) -> Dict[str, Any]:
         """
         Run complete analysis pipeline
         
@@ -523,7 +530,7 @@ def main():
     """
     try:
         # Initialize processor
-        processor = DatasetProcessor(data_dir="data", target_variance=0.95)
+        processor = DatasetProcessor(data_dir="../../data", target_variance=0.95)
         
         # Run full analysis
         summary = processor.run_full_analysis(

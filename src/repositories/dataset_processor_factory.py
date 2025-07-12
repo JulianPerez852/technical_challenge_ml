@@ -253,13 +253,23 @@ class DatasetProcessor(ABC):
     def _process_title_predictions(self, df: pd.DataFrame) -> pd.DataFrame:
         """Process title using TitleProcessor if available"""
         try:
-            from title_predictor import TitleProcessor
+            try:
+                from title_predictor import TitleProcessor
+            except ImportError:
+                from repositories.title_predictor import TitleProcessor
             
-            processor = TitleProcessor(
-                model_path='../../data/modelo_final.joblib',
-                scaler_path='../../data/modelo_scaler.joblib', 
-                encoder_path='../../data/modelo_encoder.joblib'
-            )
+            try:
+                processor = TitleProcessor(
+                    model_path='../../data/modelo_final.joblib',
+                    scaler_path='../../data/modelo_scaler.joblib', 
+                    encoder_path='../../data/modelo_encoder.joblib'
+                )
+            except Exception as e:
+                processor = TitleProcessor(
+                    model_path='../data/modelo_final.joblib',
+                    scaler_path='../data/modelo_scaler.joblib', 
+                    encoder_path='../data/modelo_encoder.joblib'
+                )
             
             categorias, probabilidades = processor.predict_titles(df["title"].tolist())
             df["categoria_predicha"] = categorias

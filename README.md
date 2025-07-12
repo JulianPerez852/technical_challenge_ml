@@ -153,3 +153,319 @@ Los resultados y modelos generados se guardan en la carpeta `data`:
 
 ---
 
+## Procesamiento completo del dataset y preparación para modelos
+
+Después de la predicción de títulos, se realiza un proceso exhaustivo de obtención y procesado de las variables que se van a utilizar en el entrenamiento de modelos. Este proceso fue explorado inicialmente en el notebook Jupyter `eda.ipynb` y posteriormente se convirtió en un script independiente llamado `process_datasets.py`.
+
+### Funcionalidades del procesamiento de datos
+
+El pipeline de procesamiento incluye las siguientes etapas principales:
+
+**1. Extracción de características de campos complejos:**
+- **Shipping**: Extrae `local_pick_up`, `free_shipping`, y `mode` de datos JSON anidados
+- **Métodos de pago**: Procesa la lista de métodos de pago no-MercadoPago y crea variables dummy para cada tipo (Visa, MasterCard, Transferencia bancaria, Efectivo, etc.)
+- **Variaciones de productos**: Calcula número de variaciones, cantidad disponible promedio por variación
+- **Tags**: Crea variables dummy para tags importantes como `dragged_bids_and_visits`, `good_quality_thumbnail`, etc.
+
+**2. Codificación de variables categóricas:**
+- **Tipos de listado**: One-hot encoding para `bronze`, `silver`, `free`, `gold_special`, `gold`, `gold_premium`, `gold_pro`
+- **Modos de compra**: Variables dummy para `buy_it_now`, `classified`, `auction`
+- **Modos de envío**: Codificación para `custom`, `not_specified`, `me1`, `me2`
+
+**3. Procesamiento geográfico:**
+- Extracción del estado del vendedor desde `seller_address` (campo JSON complejo)
+- Agrupación de estados en top 5 (Capital Federal, Buenos Aires, Santa Fe, Córdoba, Mendoza) + "Otros"
+- One-hot encoding de los grupos de estados
+
+**4. Procesamiento de garantías:**
+- Clasificación de tipos de garantía en dos categorías principales:
+  - `sin_garantia`: Sin garantía, Garantía de autenticidad/descripción, Garantía basada en reputación
+  - `garantia_especifica`: Garantías oficiales, con plazo explícito, ilimitadas, etc.
+
+**5. Predicción de títulos integrada:**
+- Utiliza el modelo híbrido entrenado (`TitleProcessor`) para predecir condición desde títulos
+- Agrega probabilidades de predicción como features adicionales (`probabilidad_new`, `probabilidad_used`)
+
+**6. Balanceo de clases con SMOTE:**
+- Aplica **SMOTENC** (SMOTE para features categóricas) para balancear la variable objetivo `condition`
+- Maneja automáticamente las features categóricas binarias identificadas en el dataset
+- Mejora significativamente el balance entre productos nuevos y usados
+
+### Archivos generados en el procesamiento
+
+El script `process_datasets.py` utiliza un patrón de factory (`DatasetProcessorFactory`) para procesar tanto datos de entrenamiento como de prueba:
+
+**Entrada:**
+- `datos_con_categoria.csv` (datos de entrenamiento con warranty categorizado)
+- `datos_con_categoria_test.csv` (datos de prueba con warranty categorizado)
+
+**Salida:**
+- `training_data_features_selected.csv`: Dataset de entrenamiento completamente procesado
+- `test_data_features_selected.csv`: Dataset de prueba procesado
+- `data_clean.csv`: Dataset limpio antes del balanceo SMOTE
+
+### Ejecución del procesamiento
+
+Para ejecutar el procesamiento completo del dataset:
+
+Desde la carpeta `repositories`:
+```sh
+uv run process_datasets.py
+```
+
+**Resultado:**
+- Transforma ~50 columnas originales en más de 50 features procesadas
+- Aplica balanceo SMOTE para mejorar el entrenamiento
+- Genera datasets listos para entrenamiento de modelos de ML
+- Incluye features de embeddings de títulos y características extraídas
+
+### Flujo de datos completo
+
+1. **Datos iniciales** → `x_train.csv`, `x_test.csv`
+2. **Clasificación de garantías** → `datos_con_categoria.csv`, `datos_con_categoria_test.csv`
+3. **Procesamiento inicial** → `process_datasets.py` → `training_data_processed.csv`, `test_data_processed.csv`
+4. **Preprocesamiento avanzado** → `DatasetProcessor` → `training_data_features_selected.csv`, `test_data_features_selected.csv`
+5. **Entrenamiento de modelos** → `model_train.py` → Modelos finales `.joblib` y métricas
+
+Este procesamiento es fundamental para el éxito de los modelos de ML, ya que convierte datos crudos con campos JSON complejos en features estructuradas, balanceadas y optimizadas para algoritmos de aprendizaje automático.
+
+---
+
+## Preprocesador avanzado de datasets (DatasetProcessor)
+
+Antes del entrenamiento de modelos, se aplica un preprocesador avanzado implementado en la clase `DatasetProcessor` que realiza la limpieza final de variables y extracción de características optimizadas para algoritmos de ML.
+
+### Funcionalidades del DatasetProcessor
+
+**1. Selección automática de características:**
+- **SelectKBest**: Selección basada en puntuaciones F estadísticas
+- **Feature importance de RandomForest**: Identifica variables más predictivas
+- **Análisis de correlación**: Elimina características altamente correlacionadas
+- **Filtrado de varianza**: Remueve características con baja variabilidad
+
+**2. Reducción de dimensionalidad:**
+- **PCA (Principal Component Analysis)**: Extrae componentes principales que explican 95% de la varianza
+- **Escalado estándar**: Normalización de todas las features para algoritmos sensibles a escala
+- **Preservación de información**: Mantiene el poder predictivo mientras reduce complejidad
+
+**3. Análisis de calidad de datos:**
+- Detección automática de valores faltantes
+- Identificación de características redundantes
+- Análisis de distribución de variables
+- Reporte de correlaciones altas entre features
+
+**4. Generación de datasets optimizados:**
+- **Datasets con features seleccionadas**: Subconjunto óptimo de características originales
+- **Datasets con PCA**: Versiones con dimensionalidad reducida
+- **Múltiples configuraciones**: Permite experimentar con diferentes enfoques
+
+### Archivos generados por DatasetProcessor
+
+El preprocesador genera múltiples versiones del dataset:
+
+**Features seleccionadas:**
+- `training_data_features_selected.csv`: Dataset de entrenamiento con características optimizadas
+- `test_data_features_selected.csv`: Dataset de prueba con las mismas características
+
+**Versiones PCA (opcional):**
+- `training_data_pca.csv`: Dataset de entrenamiento con PCA aplicado
+- `test_data_pca.csv`: Dataset de prueba con PCA aplicado
+
+**Metadatos:**
+- `feature_selection_summary.json`: Reporte detallado del proceso de selección
+- Información de varianza explicada, características eliminadas, correlaciones
+
+### Ejecución del preprocesador
+
+El DatasetProcessor se ejecuta a través de la función `generate_train_dataset()` en el archivo main:
+
+```python
+def generate_train_dataset():
+    processor = DatasetProcessor(data_dir="../data", target_variance=0.95)
+    summary = processor.run_full_analysis(
+        generate_pca=True,
+        generate_features=True
+    )
+```
+
+**Configuraciones principales:**
+- `target_variance=0.95`: PCA explica al menos 95% de la varianza
+- `generate_pca=True`: Genera versiones con PCA
+- `generate_features=True`: Genera versiones con feature selection
+
+---
+
+## Entrenamiento automático de modelos de Machine Learning
+
+El último paso del pipeline es el entrenamiento de modelos de ML utilizando el script `model_train.py`, que implementa una clase `ModelTrainer` con funcionalidades avanzadas para entrenar, evaluar y seleccionar automáticamente el mejor modelo.
+
+### Características principales del ModelTrainer
+
+**1. Entrenamiento de múltiples modelos:**
+- **RandomForest**: Clasificador de bosques aleatorios con hiperparámetros optimizados
+- **GradientBoosting**: Clasificador de gradient boosting con configuración avanzada  
+- **LightGBM**: Modelo de gradient boosting ligero y eficiente
+
+**2. Optimización automática de hiperparámetros:**
+- **GridSearchCV** con validación cruzada de 3 folds
+- Búsqueda exhaustiva en grids de hiperparámetros predefinidos
+- Modo rápido opcional para pruebas con hiperparámetros reducidos
+
+**3. Selección inteligente del mejor modelo:**
+- **Criterio principal**: Test Accuracy (precisión en conjunto de prueba)
+- **Criterio secundario**: Test Recall (recall ponderado en conjunto de prueba)
+- Selección automática basada en rendimiento combinado
+
+**4. Guardado automático de modelos y métricas:**
+- Cada modelo entrenado se guarda como `.joblib` individual
+- El mejor modelo se guarda por separado como `best_model_overall.joblib`
+- Archivo CSV detallado con todas las métricas de ejecución
+
+### Métricas y evaluación
+
+El sistema calcula y guarda las siguientes métricas para cada modelo:
+
+- **CV Score**: Puntuación de validación cruzada durante entrenamiento
+- **Test Accuracy**: Precisión en el conjunto de prueba
+- **Test Recall**: Recall ponderado en el conjunto de prueba  
+- **Tiempo de entrenamiento**: Duración del proceso de entrenamiento
+- **Mejores hiperparámetros**: Configuración óptima encontrada
+- **Total de fits**: Número total de entrenamientos realizados
+
+### Archivos generados
+
+El script genera automáticamente:
+
+**Modelos individuales:**
+- `RandomForest_best_model.joblib`
+- `GradientBoosting_best_model.joblib`
+- `LightGBM_best_model.joblib`
+
+**Mejor modelo:**
+- `best_model_overall.joblib`: El modelo con mejor rendimiento general
+
+**Métricas detalladas:**
+- `training_metrics.csv`: Tabla completa con todas las métricas, ordenada por accuracy y recall
+
+### Ejecución del entrenamiento
+
+Para ejecutar el entrenamiento completo de modelos:
+
+Desde la carpeta `repositories`:
+```sh
+uv run model_train.py
+```
+
+**El script incluye:**
+- Modo interactivo para elegir entrenamiento rápido o completo
+- Progreso detallado con ETA para cada modelo
+- Reportes completos de clasificación
+- Top 3 mejores configuraciones para cada modelo
+- Resumen final con recomendaciones específicas
+
+### Manejo de errores y logging
+
+- **Excepciones personalizadas**: `ModelTrainingException`, `DataLoadingException`, `DataSavingException`
+- **Logging comprehensivo**: Seguimiento detallado de cada etapa del proceso
+- **Recuperación de errores**: Continúa entrenamiento aunque fallen modelos individuales
+- **Validación de datos**: Verificación automática de archivos de entrada
+
+### Pipeline completo de ML
+
+El flujo completo desde datos crudos hasta modelos listos para producción:
+
+1. **Datos iniciales** → `x_train.csv`, `x_test.csv`
+2. **Clasificación de garantías** → `warranty_handler.py` → `datos_con_categoria.csv`
+3. **Feature engineering inicial** → `process_datasets.py` → `training_data_processed.csv`
+4. **Preprocesamiento avanzado** → `DatasetProcessor` → `training_data_features_selected.csv`
+5. **Entrenamiento de modelos** → `model_train.py` → Modelos `.joblib` + métricas
+6. **Selección automática** → `best_model_overall.joblib` (listo para producción)
+
+Este sistema automatizado garantiza la reproducibilidad, trazabilidad y selección objetiva del mejor modelo basado en métricas de rendimiento claras y criterios predefinidos.
+
+---
+
+## Archivo principal de orquestación (main.py)
+
+El archivo `src/main.py` actúa como el orquestador principal de todo el pipeline de Machine Learning, proporcionando funciones organizadas para ejecutar cada etapa del proceso de manera controlada y secuencial.
+
+### Funciones principales del main.py
+
+**1. `create_data()`:**
+- Carga el dataset original desde `MLA_100k.jsonlines`
+- Realiza la división train/test de los datos
+- Genera los archivos CSV iniciales: `x_train.csv`, `x_test.csv`, `y_test.csv`, `y_train.csv`
+- Crea la estructura base de datos para el pipeline
+
+**2. `process_warranty()`:**
+- Ejecuta la clasificación automática de garantías usando `WarrantyClassifier`
+- Procesa tanto datos de entrenamiento como de prueba
+- Genera `datos_con_categoria.csv` y `datos_con_categoria_test.csv`
+- Incluye manejo completo de excepciones y logging
+
+**3. `process_explore_title()`:**
+- Ejecuta el análisis automático de títulos usando `TitleAnalyzer`
+- Genera insights y patrones de los títulos de productos
+- Crea el archivo `title_analysis_results.json` con resultados detallados
+
+**4. `process_train_title_model()`:**
+- Entrena el modelo híbrido para predicción de títulos
+- Utiliza embeddings y features extraídas del análisis de títulos
+- Guarda los modelos entrenados: `modelo_final.joblib`, `modelo_scaler.joblib`, `modelo_encoder.joblib`
+
+**5. `process_dataset()`:**
+- Ejecuta el feature engineering inicial usando `process_datasets.py`
+- Procesa campos JSON complejos y crea variables dummy
+- Aplica SMOTE para balanceo de clases
+- Genera `training_data_processed.csv` y `test_data_processed.csv`
+
+**6. `generate_train_dataset()`:**
+- Ejecuta el preprocesador avanzado `DatasetProcessor`
+- Realiza selección de características y reducción de dimensionalidad
+- Genera datasets optimizados: `training_data_features_selected.csv`
+- Proporciona análisis detallado de calidad de features
+
+**7. `train_model()`:**
+- Ejecuta el entrenamiento completo de modelos ML usando `ModelTrainer`
+- Entrena múltiples algoritmos con optimización de hiperparámetros
+- Selecciona automáticamente el mejor modelo basado en accuracy y recall
+- Genera todos los artefactos finales de modelos y métricas
+
+### Ejecución del pipeline completo
+
+El archivo main incluye una sección de ejecución que puede ejecutar todo el pipeline:
+
+```python
+if __name__ == "__main__":
+    #create_data()           # 1. Crear datos iniciales
+    #process_warranty()      # 2. Clasificar garantías
+    #process_explore_title() # 3. Analizar títulos
+    #process_train_title_model() # 4. Entrenar modelo de títulos
+    process_dataset()       # 5. Feature engineering inicial
+    generate_train_dataset() # 6. Preprocesamiento avanzado
+    train_model()           # 7. Entrenar modelos finales
+```
+
+**Características del orquestador:**
+- **Ejecución modular**: Cada función puede ejecutarse independientemente
+- **Manejo de errores**: Logging y excepciones personalizadas en cada etapa
+- **Flexibilidad**: Permite comentar/descomentar etapas según necesidades
+- **Trazabilidad**: Logging detallado de cada paso del proceso
+- **Validación**: Verificación de archivos de entrada y salida en cada etapa
+
+### Uso recomendado
+
+Para ejecutar el pipeline completo desde el inicio:
+1. Descomentar todas las funciones en `main.py`
+2. Ejecutar desde la carpeta `src`: `uv run main.py`
+3. El sistema ejecutará automáticamente todas las etapas en secuencia
+
+Para ejecutar etapas específicas:
+- Comentar las funciones no deseadas
+- Ejecutar solo las etapas necesarias
+- Útil para desarrollo iterativo y debugging
+
+El archivo main.py convierte un pipeline complejo de ML en un proceso ejecutable con un solo comando, manteniendo la flexibilidad para desarrollo y experimentación.
+
+---
+
