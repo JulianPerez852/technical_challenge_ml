@@ -14,5 +14,7 @@ dependencies = [
     "ollama",
     "sentence-transformers",
     "imblearn",
-    "seaborn"
+    "seaborn",
+    "xgboost",
+    "lightgbm"
 ]
