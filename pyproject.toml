@@ -6,5 +6,9 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "ipykernel",
-    "pandas"
+    "pandas",
+    "scipy",
+    "matplotlib",
+    "transformers",
+    "torch"
 ]
