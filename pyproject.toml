@@ -1,0 +1,20 @@
+[project]
+name = "technical-challenge-ml"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "ipykernel",
+    "pandas",
+    "scipy",
+    "matplotlib",
+    "transformers",
+    "torch",
+    "ollama",
+    "sentence-transformers",
+    "imblearn",
+    "seaborn",
+    "xgboost",
+    "lightgbm"
+]
