@@ -10,5 +10,7 @@ dependencies = [
     "scipy",
     "matplotlib",
     "transformers",
-    "torch"
+    "torch",
+    "ollama",
+    "sentence-transformers"
 ]
